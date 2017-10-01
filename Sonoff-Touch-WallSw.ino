@@ -26,7 +26,8 @@
 
 #define LONG_PRESS_MS 1000
 #define SHORT_PRESS_MS 100
-#define CONFIG_WIFI_PRESS_MS 15000
+#define CONFIG_WIFI_PRESS_MS 5000
+#define CONFIG_TOUCHES_COUNT 3
 
 #define MQTT_CHECK_MS 30000
 
@@ -36,22 +37,22 @@
 //define your default values here, if there are different values in config.json, they are overwritten.
 char mqtt_server[40] = "10.0.1.50";
 char mqtt_port[6] = "1883";
+char mqtt_user[24] = "";
+char mqtt_pass[24] = "";
 char unit_id[16] = "wallsw0";
 char group_id[16] = "wallswgrp0";
 
 // The extra parameters to be configured (can be either global or just in the setup)
 // After connecting, parameter.getValue() will get you the configured value
 // id/name placeholder/prompt default length
-WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqtt_server, 40);
-WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port, 6);
-WiFiManagerParameter custom_unit_id("unit", "unit id", unit_id, 16);
-WiFiManagerParameter custom_group_id("group", "group id", group_id, 16);
-
+WiFiManagerParameter custom_mqtt_server = NULL;
+WiFiManagerParameter custom_mqtt_port = NULL;
+WiFiManagerParameter custom_mqtt_user = NULL;
+WiFiManagerParameter custom_mqtt_pass = NULL;
+WiFiManagerParameter custom_unit_id = NULL;
+WiFiManagerParameter custom_group_id = NULL;
 ///////
 
-
-//#define MQTT_SERVER "10.0.1.50"
-#define MQTT_PORT 1883
 
 #define OTA_PASS "UPDATE_PW"
 #define OTA_PORT 8266
@@ -63,10 +64,11 @@ WiFiManagerParameter custom_group_id("group", "group id", group_id, 16);
 volatile int desiredRelayState = 0;
 volatile int relayState = 0;
 volatile unsigned long millisSinceChange = 0;
+volatile int noOfConfigTouches = 0;
 
-boolean sendGroupEventTopic = false;
-boolean configWifi = false;
-boolean sendEvent = true;
+volatile boolean sendGroupEventTopic = false;
+volatile boolean configWifi = false;
+volatile boolean sendEvent = true;
 boolean sendStatus = true;
 
 unsigned long lastMQTTCheck = -MQTT_CHECK_MS; //This will force an immediate check on init.
@@ -93,7 +95,7 @@ void checkMQTTConnection() {
     if (WiFi.status() == WL_CONNECTED) {
       //Wifi connected, attempt to connect to server
       Serial.print(F("new connection: "));
-      if (client.connect(custom_unit_id.getValue())) {
+      if (client.connect(custom_unit_id.getValue(), custom_mqtt_user.getValue(), custom_mqtt_pass.getValue())) {
         Serial.println(F("connected"));
         client.subscribe(actionTopic.c_str());
       } else {
@@ -146,6 +148,7 @@ void shortPress() {
   desiredRelayState = !desiredRelayState; //Toggle relay state.
   sendGroupEventTopic = false;
   sendEvent = true;
+  noOfConfigTouches = 0;
 }
 
 //
@@ -155,14 +158,16 @@ void longPress() {
   desiredRelayState = !desiredRelayState; //Toggle relay state.
   sendGroupEventTopic = true;
   sendEvent = true;
+  noOfConfigTouches = 0;
 }
 
 //
 // Handle looong config touch
 //
 void configWifiPress() {
-  Serial.println("Wifi config requested");
-  configWifi = true;
+  noOfConfigTouches++;
+  if (noOfConfigTouches >= CONFIG_TOUCHES_COUNT)
+    configWifi = true;
 }
 
 
@@ -172,9 +177,7 @@ void configWifiPress() {
 void buttonChangeCallback() {
   if (digitalRead(0) == 1) {
 
-    Serial.println(millis() - millisSinceChange);
-
-    //Button has been released, trigger one of the two possible options.
+    // Button has been released, trigger one of the two possible options.
     if (millis() - millisSinceChange > CONFIG_WIFI_PRESS_MS) {
       configWifiPress();
     }
@@ -182,7 +185,6 @@ void buttonChangeCallback() {
       longPress();
     }
     else if (millis() - millisSinceChange > SHORT_PRESS_MS) {
-      //Short press
       shortPress();
     }
     else {
