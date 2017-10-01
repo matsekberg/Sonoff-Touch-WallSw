@@ -8,10 +8,10 @@
    Runs on this harware:
    http://sonoff.itead.cc/en/products/residential/sonoff-touch
 
-   Flashed in Arduino IDE with these parameters:
+   Flashed via USB/OTA in Arduino IDE with these parameters:
    Board:       Generic ESP8285 Module
-   Flash size:  4M (1M SPIFFS)
-
+   Flash size:  1M (64K SPIFFS)
+   
    Based on this work:
    https://github.com/davidmpye/Sonoff-Touch-MQTT
 */
