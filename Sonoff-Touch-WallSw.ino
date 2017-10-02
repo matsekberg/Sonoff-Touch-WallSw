@@ -310,6 +310,8 @@ void loop() {
 
   // Handle looong touch to reconfigure all parameters
   if (configWifi) {
+    espClient.stop();
+    delay(1000);
     initWifiManager(true);
   }
 
