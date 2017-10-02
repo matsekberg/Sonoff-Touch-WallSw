@@ -31,7 +31,7 @@
 
 #define MQTT_CHECK_MS 30000
 
-#define F(x) (x)
+//#define F(x) (x)
 
 ////// config values
 //define your default values here, if there are different values in config.json, they are overwritten.
@@ -83,6 +83,7 @@ String eventTopic;       // published when the switch is touched
 String groupEventTopic;  // published when the switch was long touched
 String statusTopic;      // published when the relay changes state wo switch touch
 String actionTopic;      // subscribed to to change relay status
+String groupActionTopic; // subscribed to to change relay status based on groupid
 
 //
 // Connect to MQTT broker
@@ -122,10 +123,9 @@ void checkMQTTConnection() {
 //
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   Serial.print(F("MQTT sub: "));
-  Serial.print(topic);
-  Serial.println(F(" = "));
+  Serial.println(topic);
 
-  if (!strcmp(topic, actionTopic.c_str())) {
+  if (!strcmp(topic, actionTopic.c_str()) || !strcmp(topic, groupActionTopic.c_str())) {
     if ((char)payload[0] == '1' || ! strncasecmp_P((char *)payload, "on", length)) {
       desiredRelayState = 1;
     }
@@ -264,6 +264,7 @@ void setup() {
   statusTopic = String(F("status/")) + custom_unit_id.getValue() + String(F("/relay"));
   // and subscribe topic
   actionTopic = String(F("action/")) + custom_unit_id.getValue() + String(F("/relay"));
+  groupActionTopic = String(F("action/")) + custom_group_id.getValue() + String(F("/relay"));
 
   client.setServer(custom_mqtt_server.getValue(), atoi(custom_mqtt_port.getValue()));
   client.setCallback(MQTTcallback);
