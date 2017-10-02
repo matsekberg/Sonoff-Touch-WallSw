@@ -7,7 +7,7 @@
 
 #include <ArduinoJson.h>          //https://github.com/bblanchon/ArduinoJson
 
-#define CONFIG_VERSION "001"
+#define CONFIG_VERSION "002"
 
 //flag for saving data
 bool shouldSaveConfig = false;
