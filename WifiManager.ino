@@ -7,6 +7,7 @@
 
 #include <ArduinoJson.h>          //https://github.com/bblanchon/ArduinoJson
 
+#define CONFIG_VERSION "001"
 
 //flag for saving data
 bool shouldSaveConfig = false;
@@ -25,16 +26,13 @@ void saveConfigCallback () {
 //
 void initWifiManager(boolean zapall) {
 
-  Serial.println();
-
-  //clean FS, for testing
-  if (zapall) {
-    Serial.println(F("Zapping FS..."));
-    SPIFFS.format();
-  }
-
+  Serial.println(F("initWifiManager"));
+  if (zapall)
+    Serial.println(F("Wifi zap requested"));
+    
   //read configuration from FS json
   Serial.println(F("mounting FS..."));
+  boolean zapFS = false;
 
   if (SPIFFS.begin()) {
     Serial.println(F("mounted file system"));
@@ -52,23 +50,49 @@ void initWifiManager(boolean zapall) {
         DynamicJsonBuffer jsonBuffer;
         JsonObject& json = jsonBuffer.parseObject(buf.get());
         json.printTo(Serial);
-        if (json.success()) {
+        if (json.success())
+        {
           Serial.println(F("\nparsed json"));
-
-          strcpy(mqtt_server, json["mqtt_server"]);
-          strcpy(mqtt_port, json["mqtt_port"]);
-          strcpy(unit_id, json["unit_id"]);
-          strcpy(group_id, json["group_id"]);
-
-        } else {
-          Serial.println(F("failed to load json config"));
+          if (json.containsKey("cfg_version") && !strncasecmp_P(json["cfg_version"], CONFIG_VERSION, 3))
+          {
+            strcpy(mqtt_server, json["mqtt_server"]);
+            strcpy(mqtt_port, json["mqtt_port"]);
+            strcpy(mqtt_user, json["mqtt_user"]);
+            strcpy(mqtt_pass, json["mqtt_pass"]);
+            strcpy(unit_id, json["unit_id"]);
+            strcpy(group_id, json["group_id"]);
+          }
+          else
+          {
+            Serial.println(F("version mismatch for json config"));
+            zapFS = true;
+          }
+        }
+        else
+        {
+          Serial.println(F("failed to parse json config"));
+          zapFS = true;
         }
       }
     }
   } else {
     Serial.println("failed to mount FS");
+    zapFS = true;
   }
 
+  // clean FS
+  if (zapFS) {
+    Serial.println(F("Zapping FS..."));
+    SPIFFS.format();
+  }
+
+  // initialize wifimanager parameters, from default or from config
+  custom_mqtt_server = WiFiManagerParameter("server", "mqtt server", mqtt_server, 40);
+  custom_mqtt_port = WiFiManagerParameter("port", "mqtt port", mqtt_port, 6);
+  custom_mqtt_user = WiFiManagerParameter("user", "mqtt user", mqtt_user, 24);
+  custom_mqtt_pass = WiFiManagerParameter("pass", "mqtt pass", mqtt_pass, 24);
+  custom_unit_id = WiFiManagerParameter("unit", "unit id", unit_id, 16);
+  custom_group_id = WiFiManagerParameter("group", "group id", group_id, 16);
 
   //WiFiManager
   //Local intialization. Once its business is done, there is no need to keep it around
@@ -83,6 +107,8 @@ void initWifiManager(boolean zapall) {
   // add all your parameters here
   wifiManager.addParameter(&custom_mqtt_server);
   wifiManager.addParameter(&custom_mqtt_port);
+  wifiManager.addParameter(&custom_mqtt_user);
+  wifiManager.addParameter(&custom_mqtt_pass);
   wifiManager.addParameter(&custom_unit_id);
   wifiManager.addParameter(&custom_group_id);
 
@@ -127,8 +153,11 @@ void initWifiManager(boolean zapall) {
     Serial.println(F("saving config"));
     DynamicJsonBuffer jsonBuffer;
     JsonObject& json = jsonBuffer.createObject();
+    json["cfg_version"] = CONFIG_VERSION;
     json["mqtt_server"] = mqtt_server;
     json["mqtt_port"] = mqtt_port;
+    json["mqtt_user"] = mqtt_user;
+    json["mqtt_pass"] = mqtt_pass;
     json["unit_id"] = unit_id;
     json["group_id"] = group_id;
 
