@@ -11,12 +11,13 @@
    Flashed via USB/OTA in Arduino IDE with these parameters:
    Board:       Generic ESP8285 Module
    Flash size:  1M (64K SPIFFS)
-   
+
    Based on this work:
    https://github.com/davidmpye/Sonoff-Touch-MQTT
 */
 
 #include <ESP8266WiFi.h>
+// must increase max packet size to > 500
 #include <PubSubClient.h>
 #include <ESP8266mDNS.h>
 #include <WiFiUdp.h>
@@ -70,6 +71,8 @@ volatile boolean sendGroupEventTopic = false;
 volatile boolean configWifi = false;
 volatile boolean sendEvent = true;
 boolean sendStatus = true;
+boolean sendPong = false;
+unsigned long uptime = 0;
 
 unsigned long lastMQTTCheck = -MQTT_CHECK_MS; //This will force an immediate check on init.
 
@@ -82,8 +85,12 @@ bool printedWifiToSerial = false;
 String eventTopic;       // published when the switch is touched
 String groupEventTopic;  // published when the switch was long touched
 String statusTopic;      // published when the relay changes state wo switch touch
+String pongStatusTopic;  // publish node status topic
+String pongMetaTopic;    // publish node meta topic
+String pingTopic;        // subscribe to nodes ping topic
 String actionTopic;      // subscribed to to change relay status
 String groupActionTopic; // subscribed to to change relay status based on groupid
+
 
 //
 // Connect to MQTT broker
@@ -98,7 +105,9 @@ void checkMQTTConnection() {
       Serial.print(F("new connection: "));
       if (client.connect(custom_unit_id.getValue(), custom_mqtt_user.getValue(), custom_mqtt_pass.getValue())) {
         Serial.println(F("connected"));
+        client.subscribe(pingTopic.c_str());
         client.subscribe(actionTopic.c_str());
+        client.subscribe(groupActionTopic.c_str());
       } else {
         Serial.print(F("failed, rc="));
         Serial.println(client.state());
@@ -125,19 +134,28 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   Serial.print(F("MQTT sub: "));
   Serial.println(topic);
 
-  if (!strcmp(topic, actionTopic.c_str()) || !strcmp(topic, groupActionTopic.c_str())) {
-    if ((char)payload[0] == '1' || ! strncasecmp_P((char *)payload, "on", length)) {
+  if (!strcmp(topic, actionTopic.c_str()) || !strcmp(topic, groupActionTopic.c_str()))
+  {
+    if ((char)payload[0] == '1' || ! strncasecmp_P((char *)payload, "on", length))
+    {
       desiredRelayState = 1;
     }
-    else if ((char)payload[0] == '0' || ! strncasecmp_P((char *)payload, "off", length)) {
+    else if ((char)payload[0] == '0' || ! strncasecmp_P((char *)payload, "off", length))
+    {
       desiredRelayState = 0;
     }
-    else if ((char)payload[0] == 'X' || ! strncasecmp_P((char *)payload, "toggle", length)) {
+    else if ((char)payload[0] == 'X' || ! strncasecmp_P((char *)payload, "toggle", length))
+    {
       desiredRelayState = !desiredRelayState;
     }
-    else if ((char)payload[0] == 'S' || ! strncasecmp_P((char *)payload, "status", length)) {
+    else if ((char)payload[0] == 'S' || ! strncasecmp_P((char *)payload, "status", length))
+    {
       sendStatus = true;
     }
+  }
+  if (!strcmp(topic, pingTopic.c_str()))
+  {
+    sendPong = true;
   }
 }
 
@@ -213,6 +231,17 @@ void handleStatusChange() {
     sendStatus = true;
   }
 
+  if (sendPong)
+  {
+    Serial.print(F("MQTT pub: "));
+    String meta = getDeviceMeta();
+    Serial.print(meta);
+    Serial.print(F(" to "));    
+    Serial.println(pongMetaTopic);
+    client.publish(pongMetaTopic.c_str(), meta.c_str());
+    sendPong = false;
+  }
+
   // publish event if touched
   if (sendEvent) {
     const char* payload = (relayState == 0) ? "0" : "1";
@@ -262,9 +291,12 @@ void setup() {
   eventTopic = String(F("event/")) + custom_unit_id.getValue() + String(F("/switch"));
   groupEventTopic = String(F("event/")) + custom_group_id.getValue() + String(F("/switch"));
   statusTopic = String(F("status/")) + custom_unit_id.getValue() + String(F("/relay"));
+  pongStatusTopic = String(F("pong/")) + custom_unit_id.getValue() + String(F("/status"));
+  pongMetaTopic = String(F("pong/")) + custom_unit_id.getValue() + String(F("/meta"));
   // and subscribe topic
   actionTopic = String(F("action/")) + custom_unit_id.getValue() + String(F("/relay"));
   groupActionTopic = String(F("action/")) + custom_group_id.getValue() + String(F("/relay"));
+  pingTopic = String(F("ping/nodes"));
 
   client.setServer(custom_mqtt_server.getValue(), atoi(custom_mqtt_port.getValue()));
   client.setCallback(MQTTcallback);
@@ -296,6 +328,7 @@ void loop() {
 
   // Check MQTT connection
   if (millis() - lastMQTTCheck >= MQTT_CHECK_MS) {
+    uptime += MQTT_CHECK_MS / 1000;
     checkMQTTConnection();
     lastMQTTCheck = millis();
   }
