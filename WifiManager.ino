@@ -186,14 +186,14 @@ String getDeviceMeta() {
   DynamicJsonBuffer jsonBuffer;
   JsonObject& json = jsonBuffer.createObject();
   json["cfg_version"] = CONFIG_VERSION;
-  json["mqtt_server"] = mqtt_server;
-  json["mqtt_port"] = mqtt_port;
+  json["local_ip"] = WiFi.localIP().toString();
   json["unit_id"] = unit_id;
   json["group_id"] = group_id;
-  json["local_ip"] = WiFi.localIP().toString();
-  json["rssi"] = WiFi.RSSI();
   json["chip_id"] = String(ESP.getChipId(), 16);
+  json["rssi"] = WiFi.RSSI();
   json["uptime"] = uptime;
+  json["mqtt_server"] = mqtt_server;
+  json["mqtt_port"] = mqtt_port;
   String jsonStr;
   json.printTo(jsonStr);
   return jsonStr;
