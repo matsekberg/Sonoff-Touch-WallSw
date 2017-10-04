@@ -106,9 +106,9 @@ void checkMQTTConnection() {
       //if (client.connect(custom_unit_id.getValue(), custom_mqtt_user.getValue(), custom_mqtt_pass.getValue())) {
       if (connect(custom_unit_id.getValue(), custom_mqtt_user.getValue(), custom_mqtt_pass.getValue(), "pong/unitid/status", 1, true, "disconnect")) {
         Serial.println(F("connected"));
-        client.subscribe(pingTopic.c_str());
-        client.subscribe(actionTopic.c_str());
-        client.subscribe(groupActionTopic.c_str());
+        client.subscribe(pingTopic.c_str(), MQTTQOS0);
+        client.subscribe(actionTopic.c_str(), MQTTQOS2);
+        client.subscribe(groupActionTopic.c_str(), MQTTQOS2);
       } else {
         Serial.print(F("failed, rc="));
         Serial.println(client.state());
