@@ -103,7 +103,8 @@ void checkMQTTConnection() {
     if (WiFi.status() == WL_CONNECTED) {
       //Wifi connected, attempt to connect to server
       Serial.print(F("new connection: "));
-      if (client.connect(custom_unit_id.getValue(), custom_mqtt_user.getValue(), custom_mqtt_pass.getValue())) {
+      //if (client.connect(custom_unit_id.getValue(), custom_mqtt_user.getValue(), custom_mqtt_pass.getValue())) {
+      if (connect(custom_unit_id.getValue(), custom_mqtt_user.getValue(), custom_mqtt_pass.getValue(), "pong/unitid/status", 1, true, "disconnect")) {
         Serial.println(F("connected"));
         client.subscribe(pingTopic.c_str());
         client.subscribe(actionTopic.c_str());
