@@ -1,3 +1,0 @@
-[submodule "support"]
-	path = support
-	url = https://github.com/matsekberg/WiFi-MQTT-submodule.git
